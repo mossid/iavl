@@ -6,7 +6,6 @@ THIS FILE WILL BE MOVED INTO CRYPTO/MERKLE
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto/merkle"
@@ -16,10 +15,8 @@ import (
 
 func RunOps(input []byte, opss ...[]merkle.ProofOperator) []byte {
 	var values [][]byte
-	fmt.Println("start")
 	if input != nil {
 		values = append(values, input)
-		fmt.Printf("Values: %X\n", values[0])
 	}
 	for _, ops := range opss {
 		for _, op := range ops {
@@ -28,7 +25,6 @@ func RunOps(input []byte, opss ...[]merkle.ProofOperator) []byte {
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("Values: %X\n", values[0])
 		}
 	}
 	return values[0]
@@ -59,7 +55,7 @@ func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
 		return nil, cmn.NewError("aaaa")
 	}
 	buf := new(bytes.Buffer)
-	buf.Write(op.Key)
+	amino.EncodeByteSlice(buf, op.Key)
 	buf.Write(values[0])
 	res := op.hash(buf.Bytes())
 	return [][]byte{res}, nil

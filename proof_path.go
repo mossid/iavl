@@ -32,14 +32,16 @@ func (pwl pathWithLeaf) StringIndented(indent string) string {
 // the given root. If it returns an error, it means the leafHash or the
 // PathToLeaf is incorrect.
 func (pwl pathWithLeaf) verify(root []byte) cmn.Error {
-	leafHash := pwl.Leaf.Hash()
+	leafops := pwl.Leaf.makeProofOps()
+	leafHash := RunOps(nil, leafops[1:])
 	return pwl.Path.verify(leafHash, root)
 }
 
 // `computeRootHash` computes the root hash with leaf node.
 // Does not verify the root hash.
 func (pwl pathWithLeaf) computeRootHash() []byte {
-	leafHash := pwl.Leaf.Hash()
+	leafops := pwl.Leaf.makeProofOps()
+	leafHash := RunOps(nil, leafops[1:])
 	return pwl.Path.computeRootHash(leafHash)
 }
 
