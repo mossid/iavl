@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tendermint/go-amino"
-	"github.com/tendermint/tendermint/crypto/tmhash"
+	"github.com/tendermint/tendermint/crypto/merkle"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
@@ -51,19 +51,11 @@ func (pin proofInnerNode) stringIndented(indent string) string {
 }
 
 func (pin proofInnerNode) Hash(childHash []byte) []byte {
-	op0, op1 := pin.makeProofNode()
-	res, err := op0.Run([][]byte{childHash})
-	if err != nil {
-		panic(err)
-	}
-	res, err = op1.Run(res)
-	if err != nil {
-		panic(err)
-	}
-	return res[0]
+	ops := pin.makeProofOps()
+	return RunOps(childHash, ops)
 }
 
-func (pin proofInnerNode) makeProofNode() (PrependLengthOp, HashConcatOp) {
+func (pin proofInnerNode) makeProofOps() []merkle.ProofOperator {
 	prefix := new(bytes.Buffer)
 	suffix := new(bytes.Buffer)
 
@@ -88,7 +80,10 @@ func (pin proofInnerNode) makeProofNode() (PrependLengthOp, HashConcatOp) {
 		panic(fmt.Sprintf("Failed to hash proofInnerNode: %v", err))
 	}
 
-	return PrependLengthOp{}, HashConcatOp{nil, prefix.Bytes(), suffix.Bytes()}
+	return []merkle.ProofOperator{
+		PrependLengthOp{},
+		HashConcatOp{nil, prefix.Bytes(), suffix.Bytes()},
+	}
 }
 
 //----------------------------------------
@@ -115,29 +110,27 @@ func (pln proofLeafNode) stringIndented(indent string) string {
 		indent)
 }
 
-func (pln proofLeafNode) Hash() []byte {
-	hasher := tmhash.New()
-	buf := new(bytes.Buffer)
+func (pln proofLeafNode) makeProofOps() []merkle.ProofOperator {
+	prefix := new(bytes.Buffer)
 
-	err := amino.EncodeInt8(buf, 0)
+	err := amino.EncodeInt8(prefix, 0)
 	if err == nil {
-		err = amino.EncodeVarint(buf, 1)
+		err = amino.EncodeVarint(prefix, 1)
 	}
 	if err == nil {
-		err = amino.EncodeVarint(buf, pln.Version)
+		err = amino.EncodeVarint(prefix, pln.Version)
 	}
-	if err == nil {
-		err = amino.EncodeByteSlice(buf, pln.Key)
-	}
-	if err == nil {
-		err = amino.EncodeByteSlice(buf, pln.ValueHash)
-	}
+
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash proofLeafNode: %v", err))
 	}
-	hasher.Write(buf.Bytes())
 
-	return hasher.Sum(nil)
+	return []merkle.ProofOperator{
+		HashValueOp{},
+		AssertValuesOp{[][]byte{pln.ValueHash}},
+		PrependLengthOp{},
+		HashConcatOp{pln.Key, prefix.Bytes(), nil},
+	}
 }
 
 //----------------------------------------

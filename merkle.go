@@ -1,13 +1,38 @@
 package iavl
 
+/*
+THIS FILE WILL BE MOVED INTO CRYPTO/MERKLE
+*/
+
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
+
+func RunOps(input []byte, opss ...[]merkle.ProofOperator) []byte {
+	var values [][]byte
+	fmt.Println("start")
+	if input != nil {
+		values = append(values, input)
+		fmt.Printf("Values: %X\n", values[0])
+	}
+	for _, ops := range opss {
+		for _, op := range ops {
+			var err error
+			values, err = op.Run(values)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("Values: %X\n", values[0])
+		}
+	}
+	return values[0]
+}
 
 // HashConcat
 
