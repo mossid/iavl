@@ -51,38 +51,36 @@ func (pin proofInnerNode) stringIndented(indent string) string {
 }
 
 func (pin proofInnerNode) Hash(childHash []byte) []byte {
-	hasher := tmhash.New()
-	buf := new(bytes.Buffer)
+	op := pin.makeProofNode()
+	return op.Hash(childHash)
+}
 
-	err := amino.EncodeInt8(buf, pin.Height)
+func (pin proofInnerNode) makeProofNode() HashConcatNode {
+	prefix := new(bytes.Buffer)
+	suffix := new(bytes.Buffer)
+
+	err := amino.EncodeInt8(prefix, pin.Height)
 	if err == nil {
-		err = amino.EncodeVarint(buf, pin.Size)
+		err = amino.EncodeVarint(prefix, pin.Size)
 	}
 	if err == nil {
-		err = amino.EncodeVarint(buf, pin.Version)
+		err = amino.EncodeVarint(prefix, pin.Version)
 	}
 
 	if len(pin.Left) == 0 {
 		if err == nil {
-			err = amino.EncodeByteSlice(buf, childHash)
-		}
-		if err == nil {
-			err = amino.EncodeByteSlice(buf, pin.Right)
+			err = amino.EncodeByteSlice(suffix, pin.Right)
 		}
 	} else {
 		if err == nil {
-			err = amino.EncodeByteSlice(buf, pin.Left)
-		}
-		if err == nil {
-			err = amino.EncodeByteSlice(buf, childHash)
+			err = amino.EncodeByteSlice(prefix, pin.Left)
 		}
 	}
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash proofInnerNode: %v", err))
 	}
 
-	hasher.Write(buf.Bytes())
-	return hasher.Sum(nil)
+	return HashConcatNode{prefix.Bytes(), suffix.Bytes()}
 }
 
 //----------------------------------------
