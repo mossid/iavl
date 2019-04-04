@@ -51,11 +51,19 @@ func (pin proofInnerNode) stringIndented(indent string) string {
 }
 
 func (pin proofInnerNode) Hash(childHash []byte) []byte {
-	op := pin.makeProofNode()
-	return op.Hash(childHash)
+	op0, op1 := pin.makeProofNode()
+	res, err := op0.Run([][]byte{childHash})
+	if err != nil {
+		panic(err)
+	}
+	res, err = op1.Run(res)
+	if err != nil {
+		panic(err)
+	}
+	return res[0]
 }
 
-func (pin proofInnerNode) makeProofNode() HashConcatNode {
+func (pin proofInnerNode) makeProofNode() (PrependLengthOp, HashConcatOp) {
 	prefix := new(bytes.Buffer)
 	suffix := new(bytes.Buffer)
 
@@ -80,7 +88,7 @@ func (pin proofInnerNode) makeProofNode() HashConcatNode {
 		panic(fmt.Sprintf("Failed to hash proofInnerNode: %v", err))
 	}
 
-	return HashConcatNode{prefix.Bytes(), suffix.Bytes()}
+	return PrependLengthOp{}, HashConcatOp{nil, prefix.Bytes(), suffix.Bytes()}
 }
 
 //----------------------------------------

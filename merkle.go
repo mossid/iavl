@@ -3,6 +3,7 @@ package iavl
 import (
 	"bytes"
 
+	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -10,28 +11,23 @@ import (
 
 // HashConcat
 
-type HashConcatNode struct {
+type HashConcatOp struct {
+	Key    []byte `json:"key"`
 	Prefix []byte `json:"prefix"`
 	Suffix []byte `json:"suffix"`
 }
 
-func (node HashConcatNode) Hash(leaf []byte) []byte {
+var _ merkle.ProofOperator = HashConcatOp{}
+
+func (op HashConcatOp) hash(leaf []byte) []byte {
 	hasher := tmhash.New()
 	buf := new(bytes.Buffer)
-	buf.Write(node.Prefix)
+	buf.Write(op.Prefix)
 	buf.Write(leaf)
-	buf.Write(node.Suffix)
+	buf.Write(op.Suffix)
 	hasher.Write(buf.Bytes())
 	return hasher.Sum(nil)
 }
-
-type HashConcatOp struct {
-	Key   []byte
-	Nodes []HashConcatNode
-}
-
-// XXX: pointerify
-var _ merkle.ProofOperator = HashConcatOp{}
 
 func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
 	if len(values) != 1 {
@@ -40,11 +36,8 @@ func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
 	buf := new(bytes.Buffer)
 	buf.Write(op.Key)
 	buf.Write(values[0])
-	leaf := buf.Bytes()
-	for _, node := range op.Nodes {
-		leaf = node.Hash(leaf)
-	}
-	return [][]byte{leaf}, nil
+	res := op.hash(buf.Bytes())
+	return [][]byte{res}, nil
 }
 
 func (op HashConcatOp) GetKey() []byte {
@@ -110,4 +103,28 @@ func (op AssertValuesOp) GetKey() []byte {
 
 func (op AssertValuesOp) ProofOp() merkle.ProofOp {
 	return merkle.ProofOp{} // XXX
+}
+
+// PrependLength
+
+type PrependLengthOp struct{}
+
+var _ merkle.ProofOperator = PrependLengthOp{}
+
+func (op PrependLengthOp) Run(values [][]byte) ([][]byte, error) {
+	res := make([][]byte, len(values))
+	for i, v := range values {
+		buf := new(bytes.Buffer)
+		amino.EncodeByteSlice(buf, v)
+		res[i] = buf.Bytes()
+	}
+	return res, nil
+}
+
+func (op PrependLengthOp) GetKey() []byte {
+	return nil
+}
+
+func (op PrependLengthOp) ProofOp() merkle.ProofOp {
+	return merkle.ProofOp{}
 }
