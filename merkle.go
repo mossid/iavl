@@ -55,7 +55,9 @@ func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
 		return nil, cmn.NewError("aaaa")
 	}
 	buf := new(bytes.Buffer)
-	amino.EncodeByteSlice(buf, op.Key)
+	if op.Key != nil {
+		amino.EncodeByteSlice(buf, op.Key)
+	}
 	buf.Write(values[0])
 	res := op.hash(buf.Bytes())
 	return [][]byte{res}, nil

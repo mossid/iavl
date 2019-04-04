@@ -271,7 +271,6 @@ func (proof *RangeProof) _computeRootHash() (rootHash []byte, treeEnd bool, err 
 			innersq = rinnersq
 
 			// Recursively verify inners against remaining leaves.
-			fmt.Println("reccall")
 			derivedRoot, treeEnd, done, err := COMPUTEHASH(inners, rightmost && rpath.isRightmost())
 			if err != nil {
 				return nil, treeEnd, false, cmn.ErrorWrap(err, "recursive COMPUTEHASH call")
