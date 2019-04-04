@@ -176,6 +176,7 @@ func (proof *RangeProof) Verify(root []byte) error {
 		return cmn.ErrorWrap(ErrInvalidProof, "proof is nil")
 	}
 	err := proof.verify(root)
+	fmt.Println("errrrrr", err)
 	return err
 }
 
@@ -241,6 +242,7 @@ func (proof *RangeProof) _computeRootHash() (rootHash []byte, treeEnd bool, err 
 		leaves = rleaves
 
 		// Compute hash.
+
 		hash = (pathWithLeaf{
 			Path: path,
 			Leaf: nleaf,

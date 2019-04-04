@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	cmn "github.com/tendermint/tendermint/libs/common"
+	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 // pathWithLeaf is a path to a leaf node and the leaf node itself.
@@ -28,19 +28,44 @@ func (pwl pathWithLeaf) StringIndented(indent string) string {
 		indent)
 }
 
+/*
 // `verify` checks that the leaf node's hash + the inner nodes merkle-izes to
 // the given root. If it returns an error, it means the leafHash or the
 // PathToLeaf is incorrect.
 func (pwl pathWithLeaf) verify(root []byte) cmn.Error {
-	leafHash := pwl.Leaf.Hash()
-	return pwl.Path.verify(leafHash, root)
+	op := pwl.MakeProofO
+	hash := pwl.computeRootHash()
+	if !bytes.Equal(root, hash) {
+		return cmn.ErrorWrap(ErrInvalidProof, "")
+	}
+	return nil
 }
-
+*/
 // `computeRootHash` computes the root hash with leaf node.
 // Does not verify the root hash.
+func (pwl pathWithLeaf) MakeProofOp() (HashValueOp, AssertValuesOp, HashConcatOp, HashConcatOp) {
+	op0, op1, op2 := pwl.Leaf.MakeProofOp()
+	op3 := pwl.Path.MakeProofOp()
+	return op0, op1, op2, op3
+}
+
 func (pwl pathWithLeaf) computeRootHash() []byte {
-	leafHash := pwl.Leaf.Hash()
-	return pwl.Path.computeRootHash(leafHash)
+	ops := make([]merkle.ProofOperator, 3)
+	// I know it is adhoc, will refactor the existing rangeproof code
+	_, ops[0], ops[1], ops[2] = pwl.MakeProofOp()
+
+	// Copying merkle.ProofOperators.Verify logic
+	// Starting with nil so the AssertValuesOp can provide stored values
+	var values [][]byte
+	var err error
+	for i, op := range ops {
+		values, err = op.Run(values)
+		fmt.Println(i, fmt.Sprintf("%X", values[0]))
+		if err != nil {
+			return nil // XXX
+		}
+	}
+	return values[0]
 }
 
 //----------------------------------------
@@ -73,21 +98,30 @@ func (pl PathToLeaf) stringIndented(indent string) string {
 		indent)
 }
 
+func (pl PathToLeaf) MakeProofOp() HashConcatOp {
+	nodes := make([]HashConcatNode, len(pl))
+	for i, in := range pl {
+		nodes[i] = in.MakeProofNode()
+	}
+	// LeafNode already checks the key
+	return HashConcatOp{nil, nodes}
+}
+
+/*
 // `verify` checks that the leaf node's hash + the inner nodes merkle-izes to
 // the given root. If it returns an error, it means the leafHash or the
 // PathToLeaf is incorrect.
 func (pl PathToLeaf) verify(leafHash []byte, root []byte) cmn.Error {
+	ops := pl.MakeProofOp()
+
 	hash := leafHash
 	for i := len(pl) - 1; i >= 0; i-- {
 		pin := pl[i]
 		hash = pin.Hash(hash)
 	}
-	if !bytes.Equal(root, hash) {
-		return cmn.ErrorWrap(ErrInvalidProof, "")
-	}
+
 	return nil
 }
-
 // `computeRootHash` computes the root hash assuming some leaf hash.
 // Does not verify the root hash.
 func (pl PathToLeaf) computeRootHash(leafHash []byte) []byte {
@@ -98,7 +132,7 @@ func (pl PathToLeaf) computeRootHash(leafHash []byte) []byte {
 	}
 	return hash
 }
-
+*/
 func (pl PathToLeaf) isLeftmost() bool {
 	for _, node := range pl {
 		if len(node.Left) > 0 {
