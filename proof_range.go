@@ -217,6 +217,7 @@ func (proof *RangeProof) computeRootHash() (rootHash []byte, err error) {
 }
 
 func (proof *RangeProof) _computeRootHash() (rootHash []byte, treeEnd bool, err error) {
+	fmt.Println(proof)
 	if len(proof.Leaves) == 0 {
 		return nil, false, cmn.ErrorWrap(ErrInvalidProof, "no leaves")
 	}

@@ -82,7 +82,7 @@ func (pin proofInnerNode) makeProofOps() []merkle.ProofOperator {
 
 	return []merkle.ProofOperator{
 		PrependLengthOp{},
-		ConcatOp{nil, prefix.Bytes(), suffix.Bytes()},
+		AppendOp{nil, prefix.Bytes(), suffix.Bytes()},
 		SHA256Op{},
 	}
 }
@@ -130,7 +130,7 @@ func (pln proofLeafNode) makeProofOpsRange() []merkle.ProofOperator {
 		// SHA256Op{},
 		AssertValuesOp{[][]byte{pln.ValueHash}},
 		PrependLengthOp{},
-		ConcatOp{pln.Key, prefix.Bytes(), nil},
+		AppendOp{pln.Key, prefix.Bytes(), nil},
 		SHA256Op{},
 	}
 }
@@ -154,7 +154,7 @@ func (pln proofLeafNode) makeProofOps() []merkle.ProofOperator {
 		SHA256Op{},
 		// AssertValuesOp{[][]byte{pln.ValueHash}},
 		PrependLengthOp{},
-		ConcatOp{pln.Key, prefix.Bytes(), nil},
+		AppendOp{pln.Key, prefix.Bytes(), nil},
 		SHA256Op{},
 	}
 }

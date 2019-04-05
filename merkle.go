@@ -32,15 +32,15 @@ func RunOps(input []byte, opss ...[]merkle.ProofOperator) []byte {
 
 // Concat
 
-type ConcatOp struct {
+type AppendOp struct {
 	Key    []byte `json:"key"`
 	Prefix []byte `json:"prefix"`
 	Suffix []byte `json:"suffix"`
 }
 
-var _ merkle.ProofOperator = ConcatOp{}
+var _ merkle.ProofOperator = AppendOp{}
 
-func (op ConcatOp) concat(leaf []byte) []byte {
+func (op AppendOp) concat(leaf []byte) []byte {
 	buf := new(bytes.Buffer)
 	buf.Write(op.Prefix)
 	buf.Write(leaf)
@@ -48,8 +48,8 @@ func (op ConcatOp) concat(leaf []byte) []byte {
 	return buf.Bytes()
 }
 
-func (op ConcatOp) Run(values [][]byte) ([][]byte, error) {
-	if len(values) != 1 {
+func (op AppendOp) Run(values [][]byte) ([][]byte, error) {
+	if len(values) < 1 {
 		return nil, cmn.NewError("aaaa")
 	}
 	buf := new(bytes.Buffer)
@@ -61,11 +61,11 @@ func (op ConcatOp) Run(values [][]byte) ([][]byte, error) {
 	return [][]byte{res}, nil
 }
 
-func (op ConcatOp) GetKey() []byte {
+func (op AppendOp) GetKey() []byte {
 	return op.Key
 }
 
-func (op ConcatOp) ProofOp() merkle.ProofOp {
+func (op AppendOp) ProofOp() merkle.ProofOp {
 	buf := new(bytes.Buffer)
 	err := amino.EncodeByteSlice(buf, op.Prefix)
 	if err == nil {
@@ -89,7 +89,7 @@ type SHA256Op struct{}
 var _ merkle.ProofOperator = SHA256Op{}
 
 func (op SHA256Op) Run(values [][]byte) ([][]byte, error) {
-	if len(values) != 1 {
+	if len(values) < 1 {
 		return nil, cmn.NewError("bbb")
 	}
 	hasher := tmhash.New()
@@ -104,6 +104,32 @@ func (op SHA256Op) GetKey() []byte {
 func (op SHA256Op) ProofOp() merkle.ProofOp {
 	return merkle.ProofOp{
 		Type: "sha256",
+		Key:  nil,
+		Data: nil,
+	}
+}
+
+// Concat
+
+type ConcatOp struct{}
+
+var _ merkle.ProofOperator = ConcatOp{}
+
+func (op ConcatOp) Run(values [][]byte) ([][]byte, error) {
+	buf := new(bytes.Buffer)
+	for _, v := range values {
+		buf.Write(v)
+	}
+	return [][]byte{buf.Bytes()}, nil
+}
+
+func (op ConcatOp) GetKey() []byte {
+	return nil
+}
+
+func (op ConcatOp) ProofOp() merkle.ProofOp {
+	return merkle.ProofOp{
+		Type: "concat",
 		Key:  nil,
 		Data: nil,
 	}
@@ -170,4 +196,53 @@ func (op PrependLengthOp) ProofOp() merkle.ProofOp {
 		Key:  nil,
 		Data: nil,
 	}
+}
+
+// Apply
+
+type ApplyOp struct {
+	Ops   [][]merkle.ProofOperator
+	Argns []int
+}
+
+func (op ApplyOp) Run(values [][]byte) (res [][]byte, err error) {
+	var input [][]byte
+	for i, iops := range op.Ops {
+		ix := op.Argns[i]
+		if len(values) < ix {
+			return nil, cmn.NewError("fdsafs")
+		}
+		input, values = values[:ix], values[ix:]
+		for _, iop := range iops {
+			input, err = iop.Run(input)
+			if err != nil {
+				return nil, err
+			}
+		}
+		res = append(res, input...)
+	}
+	return res, nil
+}
+
+func (op ApplyOp) GetKey() []byte {
+	return nil
+}
+
+func (op ApplyOp) ProofOp() merkle.ProofOp {
+	// XXX: todo
+	return merkle.ProofOp{}
+	/*
+		buf := new(bytes.Buffer)
+		for _, iop := range op.Ops {
+			pop := iop.ProofOp()
+			out, err := proto.Marshal(pop)
+			if err != nil {
+				panic(err)
+			}
+			amino.EncodeByteSlice(buf, out)
+		}
+		for _, ix := range op.Argns {
+
+		}
+	*/
 }
