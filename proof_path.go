@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/tendermint/tendermint/crypto/merkle"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
@@ -32,16 +33,16 @@ func (pwl pathWithLeaf) StringIndented(indent string) string {
 // the given root. If it returns an error, it means the leafHash or the
 // PathToLeaf is incorrect.
 func (pwl pathWithLeaf) verify(root []byte) cmn.Error {
-	leafops := pwl.Leaf.makeProofOps()
-	leafHash := RunOps(nil, leafops[1:])
+	leafops := pwl.Leaf.makeProofOpsRange()
+	leafHash := RunOps(nil, leafops)
 	return pwl.Path.verify(leafHash, root)
 }
 
 // `computeRootHash` computes the root hash with leaf node.
 // Does not verify the root hash.
 func (pwl pathWithLeaf) computeRootHash() []byte {
-	leafops := pwl.Leaf.makeProofOps()
-	leafHash := RunOps(nil, leafops[1:])
+	leafops := pwl.Leaf.makeProofOpsRange()
+	leafHash := RunOps(nil, leafops)
 	return pwl.Path.computeRootHash(leafHash)
 }
 
@@ -79,11 +80,7 @@ func (pl PathToLeaf) stringIndented(indent string) string {
 // the given root. If it returns an error, it means the leafHash or the
 // PathToLeaf is incorrect.
 func (pl PathToLeaf) verify(leafHash []byte, root []byte) cmn.Error {
-	hash := leafHash
-	for i := len(pl) - 1; i >= 0; i-- {
-		pin := pl[i]
-		hash = pin.Hash(hash)
-	}
+	hash := pl.computeRootHash(leafHash)
 	if !bytes.Equal(root, hash) {
 		return cmn.ErrorWrap(ErrInvalidProof, "")
 	}
@@ -93,12 +90,8 @@ func (pl PathToLeaf) verify(leafHash []byte, root []byte) cmn.Error {
 // `computeRootHash` computes the root hash assuming some leaf hash.
 // Does not verify the root hash.
 func (pl PathToLeaf) computeRootHash(leafHash []byte) []byte {
-	hash := leafHash
-	for i := len(pl) - 1; i >= 0; i-- {
-		pin := pl[i]
-		hash = pin.Hash(hash)
-	}
-	return hash
+	ops := pl.makeProofOps()
+	return RunOps(leafHash, ops)
 }
 
 func (pl PathToLeaf) isLeftmost() bool {
@@ -166,4 +159,12 @@ func (pl PathToLeaf) Index() (idx int64) {
 		}
 	}
 	return idx
+}
+
+func (pl PathToLeaf) makeProofOps() (res []merkle.ProofOperator) {
+	for i := len(pl) - 1; i >= 0; i-- {
+		ops := pl[i].makeProofOps()
+		res = append(res, ops...)
+	}
+	return
 }

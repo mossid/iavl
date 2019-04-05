@@ -30,27 +30,25 @@ func RunOps(input []byte, opss ...[]merkle.ProofOperator) []byte {
 	return values[0]
 }
 
-// HashConcat
+// Concat
 
-type HashConcatOp struct {
+type ConcatOp struct {
 	Key    []byte `json:"key"`
 	Prefix []byte `json:"prefix"`
 	Suffix []byte `json:"suffix"`
 }
 
-var _ merkle.ProofOperator = HashConcatOp{}
+var _ merkle.ProofOperator = ConcatOp{}
 
-func (op HashConcatOp) hash(leaf []byte) []byte {
-	hasher := tmhash.New()
+func (op ConcatOp) concat(leaf []byte) []byte {
 	buf := new(bytes.Buffer)
 	buf.Write(op.Prefix)
 	buf.Write(leaf)
 	buf.Write(op.Suffix)
-	hasher.Write(buf.Bytes())
-	return hasher.Sum(nil)
+	return buf.Bytes()
 }
 
-func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
+func (op ConcatOp) Run(values [][]byte) ([][]byte, error) {
 	if len(values) != 1 {
 		return nil, cmn.NewError("aaaa")
 	}
@@ -59,25 +57,38 @@ func (op HashConcatOp) Run(values [][]byte) ([][]byte, error) {
 		amino.EncodeByteSlice(buf, op.Key)
 	}
 	buf.Write(values[0])
-	res := op.hash(buf.Bytes())
+	res := op.concat(buf.Bytes())
 	return [][]byte{res}, nil
 }
 
-func (op HashConcatOp) GetKey() []byte {
+func (op ConcatOp) GetKey() []byte {
 	return op.Key
 }
 
-func (op HashConcatOp) ProofOp() merkle.ProofOp {
-	return merkle.ProofOp{} // XXX
+func (op ConcatOp) ProofOp() merkle.ProofOp {
+	buf := new(bytes.Buffer)
+	err := amino.EncodeByteSlice(buf, op.Prefix)
+	if err == nil {
+		amino.EncodeByteSlice(buf, op.Suffix)
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	return merkle.ProofOp{
+		Type: "concat",
+		Key:  op.Key,
+		Data: buf.Bytes(),
+	}
 }
 
-// HashValue
+// SHA256
 
-type HashValueOp struct{}
+type SHA256Op struct{}
 
-var _ merkle.ProofOperator = HashValueOp{}
+var _ merkle.ProofOperator = SHA256Op{}
 
-func (op HashValueOp) Run(values [][]byte) ([][]byte, error) {
+func (op SHA256Op) Run(values [][]byte) ([][]byte, error) {
 	if len(values) != 1 {
 		return nil, cmn.NewError("bbb")
 	}
@@ -86,15 +97,20 @@ func (op HashValueOp) Run(values [][]byte) ([][]byte, error) {
 	return [][]byte{hasher.Sum(nil)}, nil
 }
 
-func (op HashValueOp) GetKey() []byte {
+func (op SHA256Op) GetKey() []byte {
 	return nil
 }
 
-func (op HashValueOp) ProofOp() merkle.ProofOp {
-	return merkle.ProofOp{} // XXX
+func (op SHA256Op) ProofOp() merkle.ProofOp {
+	return merkle.ProofOp{
+		Type: "sha256",
+		Key:  nil,
+		Data: nil,
+	}
 }
 
 // AssertValues
+// XXX: I'm not sure do we need this
 type AssertValuesOp struct {
 	Values [][]byte
 }
@@ -149,5 +165,9 @@ func (op PrependLengthOp) GetKey() []byte {
 }
 
 func (op PrependLengthOp) ProofOp() merkle.ProofOp {
-	return merkle.ProofOp{}
+	return merkle.ProofOp{
+		Type: "prepend_length",
+		Key:  nil,
+		Data: nil,
+	}
 }

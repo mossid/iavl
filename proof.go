@@ -82,7 +82,8 @@ func (pin proofInnerNode) makeProofOps() []merkle.ProofOperator {
 
 	return []merkle.ProofOperator{
 		PrependLengthOp{},
-		HashConcatOp{nil, prefix.Bytes(), suffix.Bytes()},
+		ConcatOp{nil, prefix.Bytes(), suffix.Bytes()},
+		SHA256Op{},
 	}
 }
 
@@ -110,6 +111,30 @@ func (pln proofLeafNode) stringIndented(indent string) string {
 		indent)
 }
 
+func (pln proofLeafNode) makeProofOpsRange() []merkle.ProofOperator {
+	prefix := new(bytes.Buffer)
+
+	err := amino.EncodeInt8(prefix, 0)
+	if err == nil {
+		err = amino.EncodeVarint(prefix, 1)
+	}
+	if err == nil {
+		err = amino.EncodeVarint(prefix, pln.Version)
+	}
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to hash proofLeafNode: %v", err))
+	}
+
+	return []merkle.ProofOperator{
+		// SHA256Op{},
+		AssertValuesOp{[][]byte{pln.ValueHash}},
+		PrependLengthOp{},
+		ConcatOp{pln.Key, prefix.Bytes(), nil},
+		SHA256Op{},
+	}
+}
+
 func (pln proofLeafNode) makeProofOps() []merkle.ProofOperator {
 	prefix := new(bytes.Buffer)
 
@@ -126,10 +151,11 @@ func (pln proofLeafNode) makeProofOps() []merkle.ProofOperator {
 	}
 
 	return []merkle.ProofOperator{
-		HashValueOp{},
-		AssertValuesOp{[][]byte{pln.ValueHash}},
+		SHA256Op{},
+		// AssertValuesOp{[][]byte{pln.ValueHash}},
 		PrependLengthOp{},
-		HashConcatOp{pln.Key, prefix.Bytes(), nil},
+		ConcatOp{pln.Key, prefix.Bytes(), nil},
+		SHA256Op{},
 	}
 }
 
