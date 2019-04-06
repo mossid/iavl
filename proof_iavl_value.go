@@ -9,6 +9,17 @@ import (
 
 const ProofOpIAVLValue = "iavl:v"
 
+// IAVLValueOp consists the following merkle operators:
+// ----LEAFNODE----
+// HashValueOp{} :: hashes the input
+// PrependLengthOp{} :: prepends the length to the input
+// HashConcatOp{key, prefix, nil} :: append key and prefix to the input
+// ----INNERNODES----
+// repeat {
+//   PrependLengthOp{} :: prepends the length to the input
+//   HashConcatOp{nil, prefix, suffix} :: append prefix and suffix to the input
+// }
+//
 // IAVLValueOp takes a key and a single value as argument and
 // produces the root hash.
 //
@@ -27,6 +38,7 @@ type IAVLValueOp struct {
 var _ merkle.ProofOperator = IAVLValueOp{}
 
 func NewIAVLValueOp(key []byte, proof *RangeProof) IAVLValueOp {
+
 	return IAVLValueOp{
 		key:   key,
 		Proof: proof,

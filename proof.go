@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tendermint/go-amino"
-	"github.com/tendermint/tendermint/crypto/tmhash"
+	"github.com/tendermint/tendermint/crypto/merkle"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
@@ -51,38 +51,40 @@ func (pin proofInnerNode) stringIndented(indent string) string {
 }
 
 func (pin proofInnerNode) Hash(childHash []byte) []byte {
-	hasher := tmhash.New()
-	buf := new(bytes.Buffer)
+	ops := pin.makeProofOps()
+	return RunOps(childHash, ops)
+}
 
-	err := amino.EncodeInt8(buf, pin.Height)
+func (pin proofInnerNode) makeProofOps() []merkle.ProofOperator {
+	prefix := new(bytes.Buffer)
+	suffix := new(bytes.Buffer)
+
+	err := amino.EncodeInt8(prefix, pin.Height)
 	if err == nil {
-		err = amino.EncodeVarint(buf, pin.Size)
+		err = amino.EncodeVarint(prefix, pin.Size)
 	}
 	if err == nil {
-		err = amino.EncodeVarint(buf, pin.Version)
+		err = amino.EncodeVarint(prefix, pin.Version)
 	}
 
 	if len(pin.Left) == 0 {
 		if err == nil {
-			err = amino.EncodeByteSlice(buf, childHash)
-		}
-		if err == nil {
-			err = amino.EncodeByteSlice(buf, pin.Right)
+			err = amino.EncodeByteSlice(suffix, pin.Right)
 		}
 	} else {
 		if err == nil {
-			err = amino.EncodeByteSlice(buf, pin.Left)
-		}
-		if err == nil {
-			err = amino.EncodeByteSlice(buf, childHash)
+			err = amino.EncodeByteSlice(prefix, pin.Left)
 		}
 	}
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash proofInnerNode: %v", err))
 	}
 
-	hasher.Write(buf.Bytes())
-	return hasher.Sum(nil)
+	return []merkle.ProofOperator{
+		PrependLengthOp{},
+		AppendOp{nil, prefix.Bytes(), suffix.Bytes()},
+		SHA256Op{},
+	}
 }
 
 //----------------------------------------
@@ -109,29 +111,52 @@ func (pln proofLeafNode) stringIndented(indent string) string {
 		indent)
 }
 
-func (pln proofLeafNode) Hash() []byte {
-	hasher := tmhash.New()
-	buf := new(bytes.Buffer)
+func (pln proofLeafNode) makeProofOpsRange() []merkle.ProofOperator {
+	prefix := new(bytes.Buffer)
 
-	err := amino.EncodeInt8(buf, 0)
+	err := amino.EncodeInt8(prefix, 0)
 	if err == nil {
-		err = amino.EncodeVarint(buf, 1)
+		err = amino.EncodeVarint(prefix, 1)
 	}
 	if err == nil {
-		err = amino.EncodeVarint(buf, pln.Version)
+		err = amino.EncodeVarint(prefix, pln.Version)
 	}
-	if err == nil {
-		err = amino.EncodeByteSlice(buf, pln.Key)
-	}
-	if err == nil {
-		err = amino.EncodeByteSlice(buf, pln.ValueHash)
-	}
+
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash proofLeafNode: %v", err))
 	}
-	hasher.Write(buf.Bytes())
 
-	return hasher.Sum(nil)
+	return []merkle.ProofOperator{
+		// SHA256Op{},
+		AssertValuesOp{[][]byte{pln.ValueHash}},
+		PrependLengthOp{},
+		AppendOp{pln.Key, prefix.Bytes(), nil},
+		SHA256Op{},
+	}
+}
+
+func (pln proofLeafNode) makeProofOps() []merkle.ProofOperator {
+	prefix := new(bytes.Buffer)
+
+	err := amino.EncodeInt8(prefix, 0)
+	if err == nil {
+		err = amino.EncodeVarint(prefix, 1)
+	}
+	if err == nil {
+		err = amino.EncodeVarint(prefix, pln.Version)
+	}
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to hash proofLeafNode: %v", err))
+	}
+
+	return []merkle.ProofOperator{
+		SHA256Op{},
+		// AssertValuesOp{[][]byte{pln.ValueHash}},
+		PrependLengthOp{},
+		AppendOp{pln.Key, prefix.Bytes(), nil},
+		SHA256Op{},
+	}
 }
 
 //----------------------------------------
